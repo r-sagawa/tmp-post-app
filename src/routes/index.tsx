@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { serveStatic } from "hono/deno";
 import { logger } from "hono/logger";
 import { Layout } from "../components/Layout.tsx";
-import { cache } from "hono/cache";
 import { PostItem } from "../components/PostItem.tsx";
 import * as v from "@valibot/valibot";
 import { vValidator } from "@hono/valibot-validator";
@@ -20,23 +19,6 @@ const app = new Hono();
 app.use(logger());
 app.use("*", Layout);
 
-// app.get(
-//   "/static/:fileName{.+\\.css}",
-//   cache({
-//     cacheName: "temp-log-static-css",
-//     cacheControl: "max-age=604800",
-//     wait: true,
-//   })
-// );
-app.get(
-  "/static/htmx.min.js",
-  cache({
-    cacheName: "temp-log-static-htmx",
-    cacheControl: "max-age=2592000",
-    wait: true,
-  })
-);
-
 app.use("/static/*", serveStatic({ root: "./" }));
 
 app.onError((err, c) => {
@@ -51,18 +33,13 @@ app.onError((err, c) => {
 
 app.notFound((c) => c.render(<h1>404 Not Found</h1>));
 
-async function getPosts(kv: Deno.Kv): Promise<Post[]> {
+app.get("/", async (c) => {
+  const kv = await kvPromise;
   const posts: Post[] = [];
   for await (const entry of kv.list<Post>({ prefix: POST_PREFIX })) {
     posts.push(entry.value);
   }
   posts.sort((a, b) => b.createdAt - a.createdAt);
-  return posts;
-}
-
-app.get("/", async (c) => {
-  const kv = await kvPromise;
-  const posts = await getPosts(kv);
 
   return c.render(
     <>
